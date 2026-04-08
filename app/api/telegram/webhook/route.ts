@@ -35,50 +35,86 @@ function buildReply(
 
 export async function POST(request: Request) {
   try {
-  const body = await request.json();
+    const body = await request.json();
 
-  const messageText: string | undefined = body.message?.text;
-  const telegramUserId: string | undefined =
-    body.message?.from?.id != null ? String(body.message.from.id) : undefined;
-  const telegramChatId: string | undefined =
-    body.message?.chat?.id != null ? String(body.message.chat.id) : undefined;
+    const messageText: string | undefined = body.message?.text;
+    const telegramUserId: string | undefined =
+      body.message?.from?.id != null ? String(body.message.from.id) : undefined;
+    const telegramChatId: string | undefined =
+      body.message?.chat?.id != null ? String(body.message.chat.id) : undefined;
 
-  if (!messageText) {
-    return NextResponse.json({ ok: true, ignored: true });
-  }
+    if (!messageText) {
+      return NextResponse.json({ ok: true, ignored: true });
+    }
 
-  const telegramConnection = await prisma.telegramConnection.findFirst({
-    where: { telegramUserId, telegramChatId },
-  });
+    // /connect flow
+    if (messageText.startsWith("/connect")) {
+      const email = messageText.slice("/connect".length).trim();
 
-  if (!telegramConnection) {
-    return NextResponse.json(
-      { ok: false, error: "Telegram connection not found" },
-      { status: 404 }
-    );
-  }
+      if (!email) {
+        await sendTelegramMessage(telegramChatId!, "שלח: /connect your-email@example.com");
+        return NextResponse.json({ ok: false, error: "Email missing" });
+      }
 
-  const { userId } = telegramConnection;
+      const user = await prisma.user.findUnique({ where: { email } });
 
-  const [traderProfile, riskRules, mentalProfile, coachingPreferences] =
-    await Promise.all([
+      if (!user) {
+        await sendTelegramMessage(telegramChatId!, "לא נמצא משתמש עם המייל הזה.");
+        return NextResponse.json({ ok: false, error: "User not found" });
+      }
+
+      await prisma.telegramConnection.upsert({
+        where: { userId: user.id },
+        update: {
+          telegramUserId: telegramUserId!,
+          telegramChatId: telegramChatId!,
+          status: "connected",
+          botConnectedAt: new Date(),
+        },
+        create: {
+          userId: user.id,
+          telegramUserId: telegramUserId!,
+          telegramChatId: telegramChatId!,
+          status: "connected",
+          botConnectedAt: new Date(),
+        },
+      });
+
+      await sendTelegramMessage(telegramChatId!, "החיבור הצליח. מעכשיו אני מזהה אותך.");
+
+      return NextResponse.json({ ok: true, linked: true, userId: user.id });
+    }
+
+    // Coach reply flow
+    const telegramConnection = await prisma.telegramConnection.findFirst({
+      where: { telegramUserId, telegramChatId },
+    });
+
+    if (!telegramConnection) {
+      await sendTelegramMessage(
+        telegramChatId!,
+        "כדי להתחבר, שלח: /connect your-email@example.com"
+      );
+      return NextResponse.json(
+        { ok: false, error: "Telegram connection not found" },
+        { status: 404 }
+      );
+    }
+
+    const { userId } = telegramConnection;
+
+    const [, riskRules] = await Promise.all([
       prisma.traderProfile.findUnique({ where: { userId } }),
       prisma.riskRules.findUnique({ where: { userId } }),
       prisma.mentalProfile.findUnique({ where: { userId } }),
       prisma.coachingPreferences.findUnique({ where: { userId } }),
     ]);
 
-  const reply = buildReply(messageText, riskRules);
+    const reply = buildReply(messageText, riskRules);
 
-  await sendTelegramMessage(telegramChatId!, reply);
+    await sendTelegramMessage(telegramChatId!, reply);
 
-  return NextResponse.json({
-    ok: true,
-    messageText,
-    userId,
-    reply,
-    sent: true,
-  });
+    return NextResponse.json({ ok: true, messageText, userId, reply, sent: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
