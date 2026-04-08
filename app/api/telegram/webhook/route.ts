@@ -47,42 +47,48 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, ignored: true });
     }
 
-    // /connect flow
-    if (messageText.startsWith("/connect")) {
-      const email = messageText.slice("/connect".length).trim();
+    // /start <token> deep-link flow
+    if (messageText.startsWith("/start")) {
+      const token = messageText.slice("/start".length).trim();
 
-      if (!email) {
-        await sendTelegramMessage(telegramChatId!, "שלח: /connect your-email@example.com");
-        return NextResponse.json({ ok: false, error: "Email missing" });
+      if (!token) {
+        await sendTelegramMessage(telegramChatId!, "שלח קישור חיבור מהאתר כדי להתחבר.");
+        return NextResponse.json({ ok: false, error: "Token missing" });
       }
 
-      const user = await prisma.user.findUnique({ where: { email } });
+      const linkToken = await prisma.telegramLinkToken.findUnique({ where: { token } });
 
-      if (!user) {
-        await sendTelegramMessage(telegramChatId!, "לא נמצא משתמש עם המייל הזה.");
-        return NextResponse.json({ ok: false, error: "User not found" });
+      const now = new Date();
+      if (!linkToken || linkToken.usedAt || linkToken.expiresAt < now) {
+        await sendTelegramMessage(telegramChatId!, "הקישור לא תקין או שפג תוקף.");
+        return NextResponse.json({ ok: false, error: "Invalid or expired token" });
       }
 
       await prisma.telegramConnection.upsert({
-        where: { userId: user.id },
+        where: { userId: linkToken.userId },
         update: {
           telegramUserId: telegramUserId!,
           telegramChatId: telegramChatId!,
           status: "connected",
-          botConnectedAt: new Date(),
+          botConnectedAt: now,
         },
         create: {
-          userId: user.id,
+          userId: linkToken.userId,
           telegramUserId: telegramUserId!,
           telegramChatId: telegramChatId!,
           status: "connected",
-          botConnectedAt: new Date(),
+          botConnectedAt: now,
         },
+      });
+
+      await prisma.telegramLinkToken.update({
+        where: { token },
+        data: { usedAt: now },
       });
 
       await sendTelegramMessage(telegramChatId!, "החיבור הצליח. מעכשיו אני מזהה אותך.");
 
-      return NextResponse.json({ ok: true, linked: true, userId: user.id });
+      return NextResponse.json({ ok: true, linked: true, userId: linkToken.userId });
     }
 
     // Coach reply flow
@@ -93,7 +99,7 @@ export async function POST(request: Request) {
     if (!telegramConnection) {
       await sendTelegramMessage(
         telegramChatId!,
-        "כדי להתחבר, שלח: /connect your-email@example.com"
+        "כדי להתחבר, היכנס לאתר וצור קישור חיבור."
       );
       return NextResponse.json(
         { ok: false, error: "Telegram connection not found" },
