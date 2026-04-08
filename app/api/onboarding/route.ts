@@ -66,13 +66,16 @@ export async function POST(request: Request) {
     }
   }
 
+  const now = new Date();
   const user = await prisma.user.upsert({
     where: { email },
     update: {},
     create: {
       email,
       role: "user",
-      subscriptionStatus: "INACTIVE",
+      subscriptionStatus: "TRIALING",
+      trialStartedAt: now,
+      trialEndsAt: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
     },
   });
 

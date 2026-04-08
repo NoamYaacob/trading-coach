@@ -109,6 +109,22 @@ export async function POST(request: Request) {
 
     const { userId } = telegramConnection;
 
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const now = new Date();
+    const hasAccess =
+      user?.subscriptionStatus === "ACTIVE" ||
+      (user?.subscriptionStatus === "TRIALING" &&
+        user.trialEndsAt != null &&
+        user.trialEndsAt > now);
+
+    if (!hasAccess) {
+      await sendTelegramMessage(
+        telegramChatId!,
+        "תקופת הניסיון שלך הסתיימה או שאין לך מנוי פעיל. כדי להמשיך להשתמש בבוט, יש לחדש את הגישה דרך האתר."
+      );
+      return NextResponse.json({ ok: false, error: "Subscription inactive" });
+    }
+
     const [, riskRules] = await Promise.all([
       prisma.traderProfile.findUnique({ where: { userId } }),
       prisma.riskRules.findUnique({ where: { userId } }),

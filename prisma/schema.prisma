@@ -43,6 +43,8 @@ model User {
   passwordHash         String?
   role                 String               @default("user")
   subscriptionStatus   SubscriptionStatus   @default(INACTIVE)
+  trialStartedAt       DateTime?
+  trialEndsAt          DateTime?
   stripeCustomerId     String?
   stripeSubscriptionId String?
   createdAt            DateTime             @default(now())
