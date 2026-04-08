@@ -1,0 +1,187 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum SubscriptionStatus {
+  INACTIVE
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum TradingStyle {
+  SCALP
+  DAY_TRADING
+  SWING
+}
+
+enum CoachingTone {
+  TOUGH
+  DIRECT
+  CALM_SHARP
+}
+
+enum ResponseStyle {
+  VERY_SHORT
+  SHORT_WITH_EXPLANATION
+}
+
+enum AlertType {
+  DAILY_BRIEFING
+  PRE_NEWS
+}
+
+model User {
+  id                   String               @id @default(cuid())
+  email                String               @unique
+  passwordHash         String?
+  role                 String               @default("user")
+  subscriptionStatus   SubscriptionStatus   @default(INACTIVE)
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  telegramConnection   TelegramConnection?
+  traderProfile        TraderProfile?
+  riskRules            RiskRules?
+  tradingRules         TradingRules?
+  mentalProfile        MentalProfile?
+  coachingPreferences  CoachingPreferences?
+  sentNewsAlerts       SentNewsAlert[]
+  coachingLogs         CoachingLog[]
+}
+
+model TelegramConnection {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  telegramUserId String   @unique
+  telegramChatId String   @unique
+  botConnectedAt DateTime?
+  status         String   @default("pending")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TraderProfile {
+  id              String       @id @default(cuid())
+  userId          String       @unique
+  market          String
+  tradingStyle    TradingStyle
+  experienceYears Int
+  tradingDays     String
+  tradingSession  String
+  timezone        String       @default("Asia/Jerusalem")
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RiskRules {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  accountSize     Int
+  dailyLossLimit  Int
+  riskPerTrade    Int
+  maxTradesPerDay Int
+  stopAfterLosses Int
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TradingRules {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  allowedSetups       String
+  forbiddenConditions String
+  requiredBeforeEntry String
+  invalidationRules   String
+  allowedHours        String
+  forbiddenHours      String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MentalProfile {
+  id                String        @id @default(cuid())
+  userId            String        @unique
+  mainWeaknesses    String
+  tiltTrigger       String
+  tiltThoughts      String
+  coachingTone      CoachingTone
+  interruptionStyle String
+  responseStyle     ResponseStyle
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CoachingPreferences {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  premarketCheckinEnabled Boolean @default(true)
+  postmarketReviewEnabled Boolean @default(true)
+  checkinFormat          String
+  reviewFocus            String
+  newsAlertsEnabled      Boolean  @default(true)
+  preNewsMinutes         Int      @default(10)
+  highImpactOnly         Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NewsEvent {
+  id              String   @id @default(cuid())
+  providerEventId String?  @unique
+  title           String
+  startsAtUtc     DateTime
+  country         String?
+  impactLevel     String
+  category        String?
+  relevantMarkets String
+  source          String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  sentAlerts SentNewsAlert[]
+}
+
+model SentNewsAlert {
+  id          String    @id @default(cuid())
+  userId      String
+  newsEventId String
+  alertType   AlertType
+  sentAt      DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  newsEvent NewsEvent @relation(fields: [newsEventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, newsEventId, alertType])
+}
+
+model CoachingLog {
+  id          String   @id @default(cuid())
+  userId      String
+  source      String
+  triggerType String
+  inputText   String
+  outputText  String
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
