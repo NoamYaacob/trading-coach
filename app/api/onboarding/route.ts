@@ -15,6 +15,19 @@ export async function POST(request: Request) {
     riskPerTrade,
     maxTradesPerDay,
     stopAfterLosses,
+    mainWeaknesses,
+    tiltTrigger,
+    tiltThoughts,
+    coachingTone,
+    interruptionStyle,
+    responseStyle,
+    premarketCheckinEnabled,
+    postmarketReviewEnabled,
+    checkinFormat,
+    reviewFocus,
+    newsAlertsEnabled,
+    preNewsMinutes,
+    highImpactOnly,
   } = body;
 
   if (!email || typeof email !== "string") {
@@ -34,6 +47,14 @@ export async function POST(request: Request) {
     riskPerTrade,
     maxTradesPerDay,
     stopAfterLosses,
+    mainWeaknesses,
+    tiltTrigger,
+    tiltThoughts,
+    coachingTone,
+    interruptionStyle,
+    responseStyle,
+    checkinFormat,
+    reviewFocus,
   };
 
   for (const [field, value] of Object.entries(requiredFields)) {
@@ -55,44 +76,94 @@ export async function POST(request: Request) {
     },
   });
 
-  const [traderProfile, riskRules] = await Promise.all([
-    prisma.traderProfile.upsert({
-      where: { userId: user.id },
-      update: {
-        tradingStyle,
-        experienceYears: Number(experienceYears),
-        tradingDays,
-        tradingSession,
-      },
-      create: {
-        userId: user.id,
-        market: "FUTURES",
-        tradingStyle,
-        experienceYears: Number(experienceYears),
-        tradingDays,
-        tradingSession,
-        timezone: "Asia/Jerusalem",
-      },
-    }),
-    prisma.riskRules.upsert({
-      where: { userId: user.id },
-      update: {
-        accountSize: Number(accountSize),
-        dailyLossLimit: Number(dailyLossLimit),
-        riskPerTrade: Number(riskPerTrade),
-        maxTradesPerDay: Number(maxTradesPerDay),
-        stopAfterLosses: Number(stopAfterLosses),
-      },
-      create: {
-        userId: user.id,
-        accountSize: Number(accountSize),
-        dailyLossLimit: Number(dailyLossLimit),
-        riskPerTrade: Number(riskPerTrade),
-        maxTradesPerDay: Number(maxTradesPerDay),
-        stopAfterLosses: Number(stopAfterLosses),
-      },
-    }),
-  ]);
+  const [traderProfile, riskRules, mentalProfile, coachingPreferences] =
+    await Promise.all([
+      prisma.traderProfile.upsert({
+        where: { userId: user.id },
+        update: {
+          tradingStyle,
+          experienceYears: Number(experienceYears),
+          tradingDays,
+          tradingSession,
+        },
+        create: {
+          userId: user.id,
+          market: "FUTURES",
+          tradingStyle,
+          experienceYears: Number(experienceYears),
+          tradingDays,
+          tradingSession,
+          timezone: "Asia/Jerusalem",
+        },
+      }),
+      prisma.riskRules.upsert({
+        where: { userId: user.id },
+        update: {
+          accountSize: Number(accountSize),
+          dailyLossLimit: Number(dailyLossLimit),
+          riskPerTrade: Number(riskPerTrade),
+          maxTradesPerDay: Number(maxTradesPerDay),
+          stopAfterLosses: Number(stopAfterLosses),
+        },
+        create: {
+          userId: user.id,
+          accountSize: Number(accountSize),
+          dailyLossLimit: Number(dailyLossLimit),
+          riskPerTrade: Number(riskPerTrade),
+          maxTradesPerDay: Number(maxTradesPerDay),
+          stopAfterLosses: Number(stopAfterLosses),
+        },
+      }),
+      prisma.mentalProfile.upsert({
+        where: { userId: user.id },
+        update: {
+          mainWeaknesses,
+          tiltTrigger,
+          tiltThoughts,
+          coachingTone,
+          interruptionStyle,
+          responseStyle,
+        },
+        create: {
+          userId: user.id,
+          mainWeaknesses,
+          tiltTrigger,
+          tiltThoughts,
+          coachingTone,
+          interruptionStyle,
+          responseStyle,
+        },
+      }),
+      prisma.coachingPreferences.upsert({
+        where: { userId: user.id },
+        update: {
+          premarketCheckinEnabled: Boolean(premarketCheckinEnabled),
+          postmarketReviewEnabled: Boolean(postmarketReviewEnabled),
+          checkinFormat,
+          reviewFocus,
+          newsAlertsEnabled: Boolean(newsAlertsEnabled),
+          preNewsMinutes: Number(preNewsMinutes),
+          highImpactOnly: Boolean(highImpactOnly),
+        },
+        create: {
+          userId: user.id,
+          premarketCheckinEnabled: Boolean(premarketCheckinEnabled),
+          postmarketReviewEnabled: Boolean(postmarketReviewEnabled),
+          checkinFormat,
+          reviewFocus,
+          newsAlertsEnabled: Boolean(newsAlertsEnabled),
+          preNewsMinutes: Number(preNewsMinutes),
+          highImpactOnly: Boolean(highImpactOnly),
+        },
+      }),
+    ]);
 
-  return NextResponse.json({ ok: true, user, traderProfile, riskRules });
+  return NextResponse.json({
+    ok: true,
+    user,
+    traderProfile,
+    riskRules,
+    mentalProfile,
+    coachingPreferences,
+  });
 }
