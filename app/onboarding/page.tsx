@@ -35,6 +35,8 @@ const initialForm = {
 export default function OnboardingPage() {
   const [form, setForm] = useState(initialForm);
   const [result, setResult] = useState<unknown>(null);
+  const [saved, setSaved] = useState(false);
+  const [telegramLink, setTelegramLink] = useState<string | null>(null);
 
   function handleChange(
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -53,6 +55,17 @@ export default function OnboardingPage() {
     });
     const data = await res.json();
     setResult(data);
+    if (data.ok) setSaved(true);
+  }
+
+  async function handleConnectTelegram() {
+    const res = await fetch("/api/telegram/link-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: form.email }),
+    });
+    const data = await res.json();
+    if (data.telegramLink) setTelegramLink(data.telegramLink);
   }
 
   return (
@@ -193,6 +206,23 @@ export default function OnboardingPage() {
         <pre style={{ marginTop: "1.5rem", whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
           {JSON.stringify(result, null, 2)}
         </pre>
+      )}
+
+      {saved && (
+        <div style={{ marginTop: "1.5rem" }}>
+          <button onClick={handleConnectTelegram}>Connect Telegram</button>
+        </div>
+      )}
+
+      {telegramLink && (
+        <div style={{ marginTop: "1rem" }}>
+          <p style={{ marginBottom: "0.5rem" }}>
+            לחץ על הכפתור כדי לחבר את החשבון שלך לבוט בטלגרם.
+          </p>
+          <a href={telegramLink} target="_blank" rel="noopener noreferrer">
+            <button type="button">Open Telegram Bot</button>
+          </a>
+        </div>
       )}
     </div>
   );
