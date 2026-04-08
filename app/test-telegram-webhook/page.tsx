@@ -23,13 +23,21 @@ export default function TestTelegramWebhookPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const res = await fetch("/api/telegram/webhook", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: raw,
-    });
-    const data = await res.json();
-    setResult(data);
+    try {
+      const res = await fetch("/api/telegram/webhook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: raw,
+      });
+      const text = await res.text();
+      try {
+        setResult(JSON.parse(text));
+      } catch {
+        setResult({ ok: false, error: "Non-JSON response returned", raw: text });
+      }
+    } catch (err) {
+      setResult({ ok: false, error: String(err) });
+    }
   }
 
   return (
