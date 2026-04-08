@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { sendTelegramMessage } from "@/lib/telegram";
 
 function buildReply(
   messageText: string,
@@ -68,10 +69,13 @@ export async function POST(request: Request) {
 
   const reply = buildReply(messageText, riskRules);
 
+  await sendTelegramMessage(telegramChatId!, reply);
+
   return NextResponse.json({
     ok: true,
     messageText,
     userId,
     reply,
+    sent: true,
   });
 }
